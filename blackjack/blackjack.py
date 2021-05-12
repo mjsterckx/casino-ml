@@ -1,11 +1,24 @@
 import random
 
 
+las_vegas_table = { 8: {'2': 'H', '3': 'H', '4': 'H', '5': 'H', '6': 'H', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                    9: {'2': 'H', '3': 'D', '4': 'D', '5': 'D', '6': 'D', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   10: {'2': 'D', '3': 'D', '4': 'D', '5': 'D', '6': 'D', '7': 'D', '8': 'D', '9': 'D', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   11: {'2': 'D', '3': 'D', '4': 'D', '5': 'D', '6': 'D', '7': 'D', '8': 'D', '9': 'D', '10': 'D', 'J': 'D', 'Q': 'D', 'K': 'D', 'A': 'H'},
+                   12: {'2': 'H', '3': 'H', '4': 'S', '5': 'S', '6': 'S', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   13: {'2': 'S', '3': 'S', '4': 'S', '5': 'S', '6': 'S', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   14: {'2': 'S', '3': 'S', '4': 'S', '5': 'S', '6': 'S', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   15: {'2': 'S', '3': 'S', '4': 'S', '5': 'S', '6': 'S', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   16: {'2': 'S', '3': 'S', '4': 'S', '5': 'S', '6': 'S', '7': 'H', '8': 'H', '9': 'H', '10': 'H', 'J': 'H', 'Q': 'H', 'K': 'H', 'A': 'H'},
+                   17: {'2': 'S', '3': 'S', '4': 'S', '5': 'S', '6': 'S', '7': 'S', '8': 'S', '9': 'S', '10': 'S', 'J': 'S', 'Q': 'S', 'K': 'S', 'A': 'S'}}
+
+
 class BlackjackPlayer:
     table = None
     hands = None
     player = None
     dealer = False
+    bet = 0
 
     def __init__(self, table, player, dealer=False):
         self.table = table
@@ -18,6 +31,14 @@ class BlackjackPlayer:
 
     def reset_hands(self):
         self.hands = [[], []]
+        self.bet = 10
+
+    def end(self, dealer_score):
+        if dealer_score < self.score(0) < 22:
+            self.player.win(self.bet)
+        elif self.score(0) < dealer_score < 22:
+            self.player.lose(self.bet)
+        self.reset_hands()
 
     def score(self, hand):
         score = 0
@@ -35,14 +56,27 @@ class BlackjackPlayer:
             aces -= 1
         return score
 
-    def play(self):
-        score = self.score(0)
-        limit = 21
+    def play(self, dealer_up):
         if self.dealer:
-            limit = 17
-        while score < limit:
-            self.add_card(0, self.table.hit())
             score = self.score(0)
+            while score < 17:
+                self.add_card(0, self.table.hit())
+                score = self.score(0)
+        else:
+            move = self.play_las_vegas(dealer_up)
+            while move != 'S':
+                self.add_card(0, self.table.hit())
+                if move == 'D':
+                    self.bet *= 2
+                    return
+                move = self.play_las_vegas(dealer_up)
+
+    def play_las_vegas(self, dealer_up):
+        if self.score(0) < 8:
+            return 'H'
+        if self.score(0) > 17:
+            return 'S'
+        return las_vegas_table[self.score(0)][dealer_up]
 
 
 class BlackjackTable:
@@ -55,6 +89,7 @@ class BlackjackTable:
         self.reset_table()
 
     def reset_table(self):
+        self.cards = []
         cards = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2']
         for d in range(self.n_decks * 4):
             for c in cards:
@@ -79,16 +114,21 @@ class BlackjackTable:
             for p in self.players:
                 p.add_card(0, self.hit())
 
-    def play(self):
+    def play(self, verbose=False):
         self.players.append(BlackjackPlayer(self, None, dealer=True))
         self.deal()
+        dealer_score = 0
         for p in self.players:
-            p.play()
+            p.play(self.players[-1].hands[0][0])
             if not p.dealer:
-                print('Player ' + str(p.player.player_id) + ': ' + str(p.hands[0]) + '; score: ' + str(p.score(0)))
+                if verbose:
+                    print('Player ' + str(p.player.player_id) + ': ' + str(p.hands[0]) + '; score: ' + str(p.score(0)))
             else:
-                print('Dealer: ' + str(p.hands[0]) + '; score: ' + str(p.score(0)))
-            p.reset_hands()
+                dealer_score = p.score(0)
+                if verbose:
+                    print('Dealer: ' + str(p.hands[0]) + '; score: ' + str(p.score(0)))
         self.players.pop()
-        if len(self.cards) < (self.n_decks * 2):
+        for p in self.players:
+            p.end(dealer_score)
+        if len(self.cards) < (self.n_decks * 13 * 2):
             self.reset_table()
